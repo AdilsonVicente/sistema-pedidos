@@ -1,26 +1,59 @@
-import React from 'react';
-import logo from './logo.svg';
-import './App.css';
+import React, { lazy, useContext, useEffect, useState, Suspense } from 'react'
+import t from 'prop-types'
+import { Route, Redirect, Switch } from 'react-router-dom'
+import { LinearProgress } from '@material-ui/core'
+import { AuthContext } from './context/auth'
+import firebase from './services/firebase'
 
-function App() {
+import { HOME, LOGIN } from 'routes'
+
+const MainPage = lazy(() => import('./pages/main'))
+const Login = lazy(() => import('./pages/login'))
+
+function App ({ location }) {
+  const { userInfo, setUserInfo } = useContext(AuthContext)
+  const [didCheckUserIn, setDidCheckUserIn] = useState(false)
+
+  const { isUserLoggedIn } = userInfo
+
+  useEffect(() => {
+    firebase.auth().onAuthStateChanged((user) => {
+      console.log('dados do usuário: ', user)
+      setUserInfo({
+        isUserLoggedIn: !!user,
+        user: user && {
+          ...user,
+          firstName: user.providerData[0].displayName.split(' ')[0]
+        }
+      })
+      setDidCheckUserIn(true)
+    })
+  }, [setUserInfo])
+
+  if (!didCheckUserIn) {
+    return <LinearProgress />
+  }
+
+  if (isUserLoggedIn && location.pathname === LOGIN) {
+    return <Redirect to={HOME} />
+  }
+
+  if (!isUserLoggedIn && location.pathname !== LOGIN) {
+    return <Redirect to={LOGIN} />
+  }
+
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
-  );
+    <Suspense fallback={<LinearProgress />}>
+      <Switch>
+        <Route path={LOGIN} component={Login} />
+        <Route component={MainPage} />
+      </Switch>
+    </Suspense>
+  )
 }
 
-export default App;
+App.prototypes = {
+  location: t.object.isRequired
+}
+
+export default App
